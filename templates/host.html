@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Lobby Creation Menu</title>
+</head>
+
+<body class="text-center">
+    <center>
+    <form class="form-signin" action="{{url_for('lobby')}}" method="POST">
+        <h1>Create a new Lobby</h1><br><br>
+        <input type="hidden" name="host" value="1">
+        <button type="submit">Create Room</button>
+    </form>
+    </center>
+</body>
+</html>

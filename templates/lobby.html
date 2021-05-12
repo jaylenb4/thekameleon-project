@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>The Kameleon</title>
+        <style>
+            .selected {
+                background-color: brown;
+                color: #FFF;
+        }
+        </style>
+        <script type="text/javascript" src="//code.jquery.com/jquery-1.4.2.min.js"></script>
+        <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/socket.io/1.3.6/socket.io.min.js"></script>
+        <script type="text/javascript" charset="utf-8">
+            var socket;
+            $(document).ready(function(){
+                socket=io.connect(window.location.protocol + '//' + document.domain + ':' + location.port + '/lobby');
+                socket.on('connect', function(e) {
+                    socket.emit('join', {});
+                });
+                socket.on('usernameDisplay', function(data) {
+                    $('#usernameDisplay').text("Name : " + data.username);
+                    $('#usernameDisplay').html($('#usernameDisplay').html() + "<input type='image' src='../static/icons8-edit-24.png' id='edit_username' onclick=change_username()>");
+                    $('#iconDisplay').text("Icon : ")
+                    $('#iconDisplay').html($('#iconDisplay').html() + "<img width='30' id='current_icon' name=" + data.icon + " src='../static/icons/" + data.icon + ".png'><input type='image' src='../static/icons8-edit-24.png' id='edit_icon' onclick=change_icon()>");
+                    $('#iconDisplay').show();
+                    $('#availableIcons').text('');
+                    $('#availableIcons').hide();;
+                    for(var i=0;i<data.icons.length;i++){
+                        $('#availableIcons').append("<input type='image' width='30' src='../static/icons/" + data.icons[i] + ".png' onclick=send_new_icon(\"" + data.icons[i] + "\",\"" + $("#current_icon").attr('name') + "\")>");
+                    }
+
+                    $('#uidDisplay').text(data.uid);
+                });
+                socket.on('update_users', function(users){
+                    $('#players_list').empty();
+                    for(var i=0;i<users.length;i++){
+                        if($("#host").text() == "1"){
+                            $('#players_list').append('<li>' + (i+1) + '. '+ users[i][0] + ' <img width="30" src="../static/icons/' + users[i][1] + '.png"> Wins:' + users[i][2] + ' <button id="kick_button" type="button" onclick=kick_user(\"'+users[i][3]+'\")>x</button>&nbsp</li>');
+                        }
+                        else{
+                            $('#players_list').append('<li>' + (i+1) + '. '+ users[i][0] + ' <img width="30" src="../static/icons/' + users[i][1] + '.png"> Wins:' + users[i][2] + '&nbsp</li>');
+                        }
+                    }
+                });
+                socket.on('body_replace', function(data) {
+                    $('#edit_username').hide();
+                    $('#edit_icon').hide();
+                    $('#mainArea').html(data.msg);
+                });
+                socket.on('body_append', function(data) {
+                    $('#mainArea').html($('#mainArea').html() + data.msg);
+                });
+                socket.on('add_timer', function(duration){
+                    add_timer(duration);
+                });
+                socket.on('display_suggestion', function(data){
+                    target = data.target;
+                    source_icon = data.icon;
+                    var table = document.getElementById("voting_table");
+                    for (var i=0, row; row=table.rows[i];i++){
+                        for(var j=2;j<row.cells.length;j++)
+                        {
+                            if(row.cells[j].innerHTML == ('<img width="30" src="../static/icons/' + source_icon + '.png">') || row.cells[j].innerHTML == ('<img src="../static/icons/' + source_icon + '.png" width="30">')){
+                                row.deleteCell(j);
+                            }
+                        }
+                    }
+                    for (var i=0, row; row=table.rows[i];i++){
+                        if(row.id == target){
+                            row.innerHTML = row.innerHTML + '<td><img width="30" src="../static/icons/' + source_icon + '.png"></td>';
+                        }
+                    }
+                });
+                socket.on('show_host_options', function(e){
+                    $('#host_options').show();
+                    $("#host").text("1");
+
+                });
+                socket.on('kill_timer', function(data){
+                    clearInterval(parseInt($("#timer"+data.timerid+"").attr('name')));
+                    $("#timerdiv"+data.timerid+"").remove();
+                });
+                socket.on('kick_out', function(e){
+                    leave_room();
+                });
+                $('#start_game').click(function(e) {
+                    stimer = parseInt($('#secret_rangeId').val());
+                    vtimer = parseInt($('#voting_rangeId').val());
+                    cat = $('input[name="category"]:checked').val();
+                    if(cat == undefined){
+                        cat = "Movies";
+                    }
+                    socket.emit('start_game', {secret_timer: stimer, voting_timer: vtimer, category: cat});
+                    $('#host_options').hide();
+                    $('#credit').hide();
+                });
+
+            });
+            function change_username(){
+                uid= $("#uidDisplay").text();
+                olddisplay = $('#usernameDisplay').html();
+                $('#usernameDisplay').html("<input type='text' id='new_username' size='60' placeholder='New Username' /><button type='done' id='send_username' onclick='send_new_username()'>Done</button><br /><br />");
+            }
+            function change_icon(){
+                uid=$("#uidDisplay").text();
+                $('#iconDisplay').hide();
+                $('#availableIcons').show();
+            }
+            function kick_user(uid){
+                socket.emit('kick_user', uid);
+            }
+            function send_new_username(){
+                uid= $("#uidDisplay").text();
+                username = $("#new_username").val();
+                $("#new_username").val('');
+                socket.emit('change_username', username, uid);
+            }
+            function send_new_icon(icon, oicon){
+                userid=$("#uidDisplay").text();
+                socket.emit('change_icon', {uid: userid, new_icon:icon, old_icon:oicon})
+            }
+            function leave_room() {
+                socket.emit('leave',  $("#uidDisplay").text(), function() {
+                    socket.disconnect();
+                    window.location.href = "{{ url_for('host') }}";
+                });
+            }
+            function to_secret_words() {
+                socket.emit('to_secret_words', {});
+            }
+            function send_clue() {
+                text = $('#clue').val();
+                $('#clue').val("You sent : " + text);
+                $('#send_clue_button').hide();
+                socket.emit('send_clue', {msg: text});
+            }
+            function send_vote(data) {
+                socket.emit('send_vote',data, $("#uidDisplay").text());
+            }
+            function show_suggestion(target){
+                socket.emit('send_suggestion', target, $("#uidDisplay").text());
+            }
+            function play_again() {
+                socket.emit('play_again');
+                $('#edit_username').show();
+                $('#edit_icon').show();
+            }
+            function add_timer(data){
+                duration = data.duration;
+                timerid = data.timerid;
+                $('#timers').append("<div id='timerdiv"+timerid+"'> <h4>Timer</h4><p id='timer"+ timerid+"'>0:"+duration+"</p></div>")
+                var timer_duration = duration * 1000;
+                var xTimeLater = new Date().getTime() + timer_duration + 500;
+                var x = setInterval(function() {
+                    var now = new Date().getTime();
+
+                    var distance = xTimeLater- now;
+
+                    var minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+                    var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+                    var secondsDis = seconds.toString();
+
+                    if(seconds < 10){
+  	                    secondsDis = "0" + secondsDis;
+                    }
+                    if(document.getElementById('timer'+timerid) !== null){
+                        document.getElementById('timer'+timerid).innerHTML = minutes + ":" + secondsDis;
+                    }
+                    if (distance < 0) {
+                        clearInterval(x);
+                        socket.emit('timer_end', timerid);
+                        document.getElementById('timer'+timerid).innerHTML = "You have run out of time.";
+                    }
+                }, 1000);
+                $("#timer"+timerid+"").attr('name',x);
+            }
+        </script>   
+        <style>
+            ol#players_list li{
+                display:inline;
+                padding: 10px 20px;
+            }
+                table, th, td {
+                border: 1px solid black;
+            }
+        </style>
+        <center><h1>The Kameleon</h1>
+        <p id="credit"><small>Rules can be found at https://boardgamegeek.com/boardgame/227072/chameleon.<br />Based on The Chameleon designed by Rikki Tahta.<br />Icons from https://icons8.com</small></p>
+        </center>
+    </head>
+    <body>
+        <center>
+        <div id="client_info">
+            <ol id="players_list"></ol>
+            <h4 id="usernameDisplay">Name : </h4>
+            <h4 id="iconDisplay">Icon : </h4>
+            <h4 id="availableIcons" hidden></h4>
+            <h4 id="uidDisplay" hidden>UID: </h4>
+            <h4 id="host" hidden>0</h4>
+            <h4 id="roomDisplay">Room : {{session['lobbyid']}}</h4>
+            <h4 id="inviteLink">Invite others with this link: </h4><p>salty-cliffs-74410.herokuapp.com/join/{{session['lobbyid']}}</p>
+            <button id="leave_button" type="button" class="btn btn-danger" onclick=leave_room()>Leave game</button>
+            <div id="host_options" hidden>
+                <center><h4>Configuration Options</h4></center>
+                <center>
+                <div id="timer_settings">
+                    <div id="secret_word_timers">
+                        <label for="secret_range">Secret Word Round Timer Length (in seconds):</label>
+                        <input type="range" id="secret_rangeId" value="60" name="secret_range" min="20" max="180" oninput="secret_rangeOutputId.value = secret_rangeId.value">
+                        <output name="secret_range" id="secret_rangeOutputId">60</output>
+                    </div>
+                    <div id="voting_round_timers">
+                        <label for="secret_range">Voting Round Timer (in seconds):</label>
+                        <input type="range" id="voting_rangeId" value="30" name="voting_range" min="15" max="120" oninput="voting_rangeOutputId.value = voting_rangeId.value">
+                        <output name="voting_range" id="voting_rangeOutputId">30</output>
+                    </div>
+                </div>
+                <div id="word_categories">
+                    <center><p>Word Categories</p></center>
+                    <input type='radio' value="animals" id="animals_cat" name="category"></input>
+                    <label for="animals_cat">Animals</label>
+                    <input type='radio' value="food and cooking" id="food and cooking_cat" name="category"></input>
+                    <label for="food and cooking_cat">Food and Cooking</label>
+                    <input type='radio' value="household items" id="household items_cat" name="category"></input>
+                    <label for="household items_cat">Household Items</label>
+                    <input type='radio' value="movies" id="movies_cat" name="category"></input>
+                    <label for="movies_cat">Movies</label>
+                    <input type='radio' value="people and characters" id="people and characters_cat" name="category"></input>
+                    <label for="people and characters_cat">People and Characters</label>
+                    <input type='radio' value="travel" id="travel_cat" name="category"></input>
+                    <label for="travel_cat">Travel</label>
+                </div>
+                </center>
+                </br></br>
+                <center><button type="button" id="start_game" >Start Game</button></center><br />
+            </div>
+        </div>
+        </center>
+        <center><div id="timers"></div></center>
+        <div id="mainArea">
+        </div>
+    </body>
+</html>

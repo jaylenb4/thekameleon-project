@@ -1,22 +1,4 @@
-"""
-Notes from 3/18 meeting
--game configuration settings - giving players options - like setting game length
--display a grid of words that all match a category - initally same category and grid of words - mock up some code that can randomly pick and fill it in with static - load from file
--random selection of chameleon - want to notify the players secret "you are the chameleon" and some texts so that people can learn as they go - non chameleon players have a word highlighted in the UI and it should be randomly selected each time
--game timer - not for object to be destroyed, maybe a set number of rounds, might leave it open ended - could play another? can keep trakc of who's been the chameleon and whether they've won or lost, stages of timers, at some point have a timer and display it - start with ticking down from 5 minutes - from the server - this is when the timer ends, the display is on the client side
-All players enter a word before timer finishes - should cut them off at some point
--once all are received by the server, show each word next to each person's name - potentially animation and graphics - could start off with a table and the word
--move onto vote - new timer, vote by clicking on user in table - potentially add a feature leater that shows who hasn't entered a word or voted - as well as a way to see who everyone is considering - real-time aspect to see what the votes are
--plurality vote on the chameleon is needed for the chameleon to lose, othewise, everyone else wins
--log the results and ask for aanother round
--future:
-    number of chameleons
-    custom categories and/or selecting preferred sets of categories
-    length of timers
-    toggle for whether votes are visible
-    
 
-"""
 import random, uuid, os
 from threading import Thread
 from time import sleep
